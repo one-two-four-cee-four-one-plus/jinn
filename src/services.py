@@ -32,8 +32,9 @@ def craft_incantation(text):
         "content": (
             "Write a python function according to the request.  I want only"
             " python code in response, nothing else.  Put all necessary import"
-            " within function's body, don't comment the code  and don't do any"
-            f" exception handling unless it's necessary.  fRequest: {text}"
+            " within function's body, don't comment the code, don't ask for "
+            "user's input, don't print anything and don't do any exception handling "
+            f"unless it's necessary.  fRequest: {text}"
         )
     }]
     response = client.chat.completions.create(model=MODEL, messages=messages, temperature=0)
@@ -78,8 +79,8 @@ def wish(text):
     incantations = get_incantation_data()
     response = client.chat.completions.create(
         model=MODEL,
-        temperature=0,
-        messages=[{"role": "user", "content": text}],
+        temperature=1,
+        messages=[{"role": "user", "content": text + ' Use external tool.'}],
         tools=[value['schema'] for value in incantations.values()],
         tool_choice="auto"
     )
@@ -93,6 +94,8 @@ def wish(text):
             return func(**args)
         except Exception as e:
             return incantation['object'], tool_calls[0].function.arguments, e
+    else:
+        return 'I don\'t know how to do it'
 
 
 def fix(mishap):

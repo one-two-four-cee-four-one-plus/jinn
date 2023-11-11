@@ -188,7 +188,7 @@ def mishap_fix_and_retry_view(id):
 @bottle.post('/api/incantation')
 @require_auth
 def api_craft_incantation_view():
-    text = bottle.request.body.read().decode('utf-8')
+    text = json.loads(bottle.request.body.read().decode('utf-8'))['text']
     try:
         incantation = Incantation.craft(text)
     except Exception as e:
@@ -203,7 +203,7 @@ def api_craft_incantation_view():
 @bottle.post('/api/wish')
 @require_auth
 def api_wish_view():
-    text = bottle.request.body.read().decode('utf-8')
+    text = json.loads(bottle.request.body.read().decode('utf-8'))['text']
     match wish(text):
         case incantation, request, exception:
             incantation.mishaps.append(
@@ -213,7 +213,7 @@ def api_wish_view():
             )
             return bottle.redirect(f'/incantation/{incantation.id}?mishap=true')
         case result:
-            return str(result)
+            return str(result) if len(str(result)) < 20 else 'Result too long'
 
 
 if __name__ == '__main__':
