@@ -4,7 +4,7 @@ import traceback
 import bottle
 import macaron
 from config import DB_PATH, API_TOKEN
-from models import BaseModel, Incantation, Mishap
+from models import BaseModel, Incantation, Mishap, Incident
 from utils import define_function
 from services import wish
 
@@ -58,6 +58,15 @@ def incantations_view():
 def craft_incantation_view():
     text = bottle.request.forms.get('text')
     incantation = Incantation.craft(text)
+    if isinstance(incantation, Exception):
+        Incident.create(
+            type='craft',
+            traceback=''.join(traceback.format_exception(e, limit=-2))
+        )
+        return f'''
+            <a href="/">back</a>
+            <p>{incantation}</p>
+        '''
     return bottle.redirect(f'/incantation/{incantation.id}')
 
 
@@ -105,7 +114,13 @@ def incantation_view(id):
 @bottle.post('/incantation/<id>/override')
 def incantation_override_view(id):
     incantation = Incantation.get(id)
-    incantation.update_overrides(bottle.request.forms)
+    try:
+        incantation.update_overrides(bottle.request.forms)
+    except Exception as e:
+        Incident.create(
+            type='override',
+            traceback=''.join(traceback.format_exception(e, limit=-2))
+        )
     return bottle.redirect(f'/incantation/{id}')
 
 
@@ -137,16 +152,20 @@ def wish_view():
 @bottle.get('/mishap/<id>/fix')
 def mishap_fix_view(id):
     mishap = Mishap.get(id)
-    if mishap.fix():
-        return bottle.redirect(f'/incantation/{mishap.incantation.id}')
-    else:
+    result = mishap.fix()
+    if isinstance(result, Exception):
         return bottle.redirect(f'/incantation/{mishap.incantation.id}?mishap=true')
+    else:
+        return bottle.redirect(f'/incantation/{mishap.incantation.id}')
 
 
 @bottle.get('/mishap/<id>/fix_and_retry')
 def mishap_fix_and_retry_view(id):
     mishap = Mishap.get(id)
-    if mishap.fix():
+    result = mishap.fix()
+    if isinstance(result, Exception):
+        return bottle.redirect(f'/incantation/{mishap.incantation.id}?mishap=true')
+    else:
         # reload code
         incantation = Incantation.get(mishap.incantation.id)
         try:
@@ -164,20 +183,25 @@ def mishap_fix_and_retry_view(id):
                 traceback=''.join(traceback.format_exception(e, limit=-2))
             )
             return bottle.redirect(f'/incantation/{mishap.incantation.id}')
-    else:
-        return bottle.redirect(f'/incantation/{mishap.incantation.id}?mishap=true')
 
 
-@require_auth
 @bottle.post('/api/incantation')
+@require_auth
 def api_craft_incantation_view():
     text = bottle.request.body.read().decode('utf-8')
-    incantation = Incantation.craft(text)
+    try:
+        incantation = Incantation.craft(text)
+    except Exception as e:
+        Incident.create(
+            type='craft',
+            traceback=''.join(traceback.format_exception(e, limit=-2))
+        )
+        return 'Error'
     return bottle.redirect(f'/incantation/{incantation.id}')
 
 
-@require_auth
 @bottle.post('/api/wish')
+@require_auth
 def api_wish_view():
     text = bottle.request.body.read().decode('utf-8')
     match wish(text):

@@ -56,7 +56,7 @@ def craft_incantation(text):
             })
             continue
     else:
-        raise last_e
+        return last_e
 
 
 def get_incantation_data():

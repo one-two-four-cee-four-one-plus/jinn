@@ -120,9 +120,24 @@ class Mishap(macaron.Model, BaseModel):
 
     def fix(self):
         result = fix(self)
-        if not isinstance(result, Exception):
+        if isinstance(result, Exception):
+            return result
+        else:
             incantation = self.incantation
             incantation.code = result
             incantation.schema = describe_function(result)
             incantation.save()
-            return True
+            return self
+
+
+class Incident(macaron.Model, BaseModel):
+    type = macaron.CharField()
+    traceback = macaron.CharField()
+
+    _DDL_SQL = """
+        CREATE TABLE IF NOT EXISTS incident (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT,
+            traceback TEXT
+        )
+    """
