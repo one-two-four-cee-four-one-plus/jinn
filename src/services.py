@@ -14,6 +14,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 def describe_function(code):
     response = client.chat.completions.create(
         model=MODEL,
+        temperature=0,
         messages=[{
             "role": "user",
             "content": (
@@ -35,7 +36,7 @@ def craft_incantation(text):
             f" exception handling unless it's necessary.  fRequest: {text}"
         )
     }]
-    response = client.chat.completions.create(model=MODEL, messages=messages)
+    response = client.chat.completions.create(model=MODEL, messages=messages, temperature=0)
     messages.append({"role": "assistant", "content": response.choices[0].message.content})
 
     last_e = None
@@ -77,6 +78,7 @@ def wish(text):
     incantations = get_incantation_data()
     response = client.chat.completions.create(
         model=MODEL,
+        temperature=0,
         messages=[{"role": "user", "content": text}],
         tools=[value['schema'] for value in incantations.values()],
         tool_choice="auto"
@@ -94,14 +96,17 @@ def wish(text):
 
 
 def fix(mishap):
-    response = client.chat.completions.create(model=MODEL,
-    messages=[{"role": "user", "content": (
-        "I need you to fix python function. I will provide it's code, call"
-        " arguments formatted in some json schema and error traceback. Fix"
-        " this error. I want only python code in response, nothing else."
-        f" Code:\n{mishap.code}\nArguments:\n{mishap.request}\n"
-        f"Traceback:\n{mishap.traceback}"
-    )}])
+    response = client.chat.completions.create(
+        model=MODEL,
+        temperature=0,
+        messages=[{"role": "user", "content": (
+            "I need you to fix python function. I will provide it's code, call"
+            " arguments formatted in some json schema and error traceback. Fix"
+            " this error. I want only python code in response, nothing else."
+            f" Code:\n{mishap.code}\nArguments:\n{mishap.request}\n"
+            f"Traceback:\n{mishap.traceback}"
+        )}]
+    )
     code = unwrap_content(response.choices[0].message.content, 'python')
     try:
         define_function(code)
