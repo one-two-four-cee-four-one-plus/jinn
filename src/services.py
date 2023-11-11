@@ -1,15 +1,18 @@
 import json
 import traceback
 
-import openai
+from openai import OpenAI
 
-from config import MODEL
+from config import MODEL, OPENAI_API_KEY
 from constants import OPENAI_FUNCTION_SCHEMA
 from utils import unwrap_content, define_function, NoDefaults
 
 
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+
 def describe_function(code):
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=MODEL,
         messages=[{
             "role": "user",
@@ -19,7 +22,7 @@ def describe_function(code):
             )
         }]
     )
-    return unwrap_content(response['choices'][0]['message']['content'], 'json')
+    return unwrap_content(response.choices[0].message.content, 'json')
 
 
 def craft_incantation(text):
@@ -32,12 +35,12 @@ def craft_incantation(text):
             f" exception handling unless it's necessary.  fRequest: {text}"
         )
     }]
-    response = openai.ChatCompletion.create(model=MODEL, messages=messages)
-    messages.append({"role": "assistant", "content": response['choices'][0]['message']['content']})
+    response = client.chat.completions.create(model=MODEL, messages=messages)
+    messages.append({"role": "assistant", "content": response.choices[0].message.content})
 
     last_e = None
     for i in range(3):
-        code = unwrap_content(response['choices'][0]['message']['content'], 'python')
+        code = unwrap_content(response.choices[0].message.content, 'python')
         code = NoDefaults.in_(code)
         try:
             name, _ = define_function(code)
@@ -72,16 +75,16 @@ def get_incantation_data():
 
 def wish(text):
     incantations = get_incantation_data()
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": text}],
         tools=[value['schema'] for value in incantations.values()],
-        tool_choice="auto",
+        tool_choice="auto"
     )
     response_message = response.choices[0].message
     tool_calls = response_message.tool_calls
     if tool_calls:
-        incantation = incantations[tool_calls[0].function['name']]
+        incantation = incantations[tool_calls[0].function.name]
         _, func = define_function(incantation['code'])
         args = json.loads(tool_calls[0].function.arguments)
         try:
@@ -91,17 +94,15 @@ def wish(text):
 
 
 def fix(mishap):
-    response = openai.ChatCompletion.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": (
-            "I need you to fix python function. I will provide it's code, call"
-            " arguments formatted in some json schema and error traceback. Fix"
-            " this error. I want only python code in response, nothing else."
-            f" Code:\n{mishap.code}\nArguments:\n{mishap.request}\n"
-            f"Traceback:\n{mishap.traceback}"
-        )}],
-    )
-    code = unwrap_content(response['choices'][0]['message']['content'], 'python')
+    response = client.chat.completions.create(model=MODEL,
+    messages=[{"role": "user", "content": (
+        "I need you to fix python function. I will provide it's code, call"
+        " arguments formatted in some json schema and error traceback. Fix"
+        " this error. I want only python code in response, nothing else."
+        f" Code:\n{mishap.code}\nArguments:\n{mishap.request}\n"
+        f"Traceback:\n{mishap.traceback}"
+    )}])
+    code = unwrap_content(response.choices[0].message.content, 'python')
     try:
         define_function(code)
         return code
