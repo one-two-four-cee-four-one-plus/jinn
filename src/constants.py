@@ -21,3 +21,25 @@ OPENAI_FUNCTION_SCHEMA = {
         }
     }
 }
+CRAFT_INCANTATION_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "craft_incantation",
+        "description": (
+            "This function creates a new external tool matching definition in natural language and adds it to"
+            " the list of known tools for further use."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Tool definition in natural language"
+                }
+            },
+            "required": [
+                "text"
+            ]
+        }
+    }
+}
