@@ -246,11 +246,11 @@ class Config(macaron.Model, BaseModel):
     """
 
     @classmethod
-    def get_value(cls, key):
+    def get_value(cls, key, default=None):
         try:
             return str(cls.get("key=?", [key]).value)
         except cls.DoesNotExist:
-            return None
+            return default
 
     @classmethod
     def set_value(cls, key, value):
@@ -278,6 +278,7 @@ class Config(macaron.Model, BaseModel):
             ('openai_key', '[FILL THIS IN]'),
             ('openai_model', 'gpt-4-1106-preview'),
             ('manual_incantation_crafting', '0'),
+            ('craft_retries', '3'),
         )
         for key, value in initial_config:
             if cls.get_value(key) is None:

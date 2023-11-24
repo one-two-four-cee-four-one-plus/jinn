@@ -39,14 +39,22 @@ def craft_incantation(text):
         "role": "user",
         "content": (
             "Write a python function according to the request.  I want only"
-            " python code in response, nothing else.  Put all necessary import"
-            " within function's body, don't comment the code, don't ask for"
-            " user's input, don't print anything and don't do any exception handling"
-            " unless it's necessary. Don't use keyword or variadic arguments or"
-            " types other than int, float, str, bool as function's arguments."
-            " Don't use any external libraries. Don't use any global variables."
-            " If function needs any parameters, they should be passed as arguments."
-            f" Request: {text}"
+            " python code in response, nothing else. Don't comment the code,"
+            " don't ask for user's input, don't print anything and don't do any"
+            " exception handling unless it's necessary. Don't use keyword,"
+            " variadic arguments and types other than int, float, str, bool as"
+            " function's arguments. Don't use any global variables. If you need"
+            " any external libraries, try to import them within function's body"
+            " with try/except block. If said libraries are not available, import"
+            " pip module and install them. Example:\n"
+            "try:\n"
+            "    import numpy\n"
+            "except ImportError:\n"
+            "    import pip\n"
+            "    pip.main(['install', 'numpy'])\n"
+            "If function needs any parameters (like credentials,"
+            " configuration, etc), they should be passed as arguments. \nRequest:"
+            f"{text}"
         )
     }]
     response = client().chat.completions.create(
@@ -57,7 +65,7 @@ def craft_incantation(text):
     messages.append({"role": "assistant", "content": response.choices[0].message.content})
 
     last_e = None
-    for i in range(3):
+    for i in range(int(Config.get_value('craft_retries', 3))):
         code = unwrap_content(response.choices[0].message.content, 'python')
         code = NoDefaults.in_(code)
         try:
