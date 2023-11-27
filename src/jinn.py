@@ -33,6 +33,36 @@ def require_auth(func):
     return wrapper
 
 
+class HTMLDecorator:
+    def __init__(self, css=False, center=False):
+        self.css = css
+        self.center = center
+
+    def __call__(self, func):
+
+        def wrapper(*args, **kwargs):
+            ret = func(*args, **kwargs)
+
+            if isinstance(ret, str):
+                return f'''
+                <html>
+                <head>
+                    <link href="https://iosevka-webfonts.github.io/iosevka/iosevka.css" rel="stylesheet"/>
+                    <style>{Config.get_value('css')}</style>
+                    <title>Jinn</title>
+                </head>
+                <body>
+                    {ret}
+                </body>
+                </html>
+                '''
+            else:
+                return ret
+
+        return wrapper
+
+
+html = HTMLDecorator
 bottle.install(require_auth)
 
 
@@ -52,16 +82,16 @@ def api_master():
 
 
 @bottle.get('/login')
+@html()
 def login_view():
-    error = bottle.request.query.get('error', '')
-    return f'''
-        <p>{error}</p>
+    return bottle.template('''
+        <p>{{error}}</p>
         <form action="/login" method="post">
             <input type="text" name="username" />
             <input type="password" name="password" />
             <input type="submit" value="Login" />
         </form>
-    '''
+    ''', error=bottle.request.query.get('error', ''))
 
 
 @bottle.post('/login')
@@ -82,24 +112,26 @@ def logout_view():
 
 
 @bottle.get('/config')
+@html()
 def config_view():
-    page = '<a href="/">back</a>'
-    for config in Config.editable():
-        page += f'''
-            <form action="/config/{config.key}" method="post">
-                <label for="value">{config.key}</label>
-                <input type="text" name="value" value="{config.value}" />
-                <input type="submit" value="Update" />
-            </form>
-        '''
-    for master in Master.select('admin=?', [False]):
-        page += f'''
-        <form action="/flip_verification/{master.id}" method="post">
-        <label for="value">{master.moniker}</label>
-        <input type="submit" value="{'Verify' if master.verified == 0 else 'Unverify'}" />
+    return bottle.template('''
+    <a href="/">back</a>
+
+    % for config in configs:
+        <form action="/config/{{config.key}}" method="post">
+            <label for="value">{{config.key}}</label>
+            <input type="text" name="value" value="{{config.value}}" />
+            <input type="submit" value="Update" />
         </form>
-        '''
-    return page
+    % end
+
+    % for master in masters:
+        <form action="/flip_verification/{{master.id}}" method="post">
+            <label for="value">{{master.moniker}}</label>
+            <input type="submit" value="{{'Verify' if master.verified == 0 else 'Unverify'}}" />
+        </form>
+    % end
+    ''', configs=Config.editable(), masters=Master.select('admin=?', [False]))
 
 
 @bottle.post('/config/<key>')
@@ -118,44 +150,43 @@ def flip_verification_view(id):
 
 
 @bottle.get('/')
+@html()
 def index():
-    page = f'''
-        <a href="/incantations">incantations</a>
-        {"<a href='/config'>config</a>" if master().admin else ''}
-        <a href="/logout">logout</a>
-    '''
-    if Config.check('manual_incantation_crafting'):
-        page += f'''
-            <form action="/incantation" method="post">
-                <input type="submit" value="I wish to be able to" />
-                <input type="text" name="text" />
-            </form>
-        '''
-    page += f'''
-        <form action="/wish" method="post">
-            <input type="submit" value="I wish to" />
+    return bottle.template('''
+    <a href="/incantations">incantations</a>
+    % if master.admin:
+        <a href='/config'>config</a>
+    % end
+    <a href="/logout">logout</a>
+    % if Config.check('manual_incantation_crafting'):
+        <form action="/incantation" method="post">
+            <input type="submit" value="I wish to be able to" />
             <input type="text" name="text" />
         </form>
-    '''
-    return page
+    % end
+    <form action="/wish" method="post" id="form">
+        <input type="submit" value="I wish to" />
+    </form>
+    <textarea form="form" name="text" /></textarea>
+    ''', Config=Config, master=master())
+
 
 
 @bottle.get('/incantations')
+@html()
 def incantations_view():
-    response = f'''
+    return bottle.template('''
         <a href="/">back</a>
         <ul>
-    '''
-    for incantation in master().incantations:
-        description = json.loads(incantation.schema)['function']['description']
-        response += f'''
+        % for incantation in incantations:
             <li>
-                <a href="/incantation/{incantation.id}">{incantation.name}</a>
-                <a href="/incantation/{incantation.id}/delete">delete</a>
-                <p>{description}</p>
+                <a href="/incantation/{{incantation.id}}">{{incantation.name}}</a>
+                <a href="/incantation/{{incantation.id}}/delete">delete</a>
+                <p>{{incantation.description}}</p>
             </li>
-        '''
-    return response + '</ul>'
+        % end
+        </ul>
+    ''', incantations=master().incantations, json=json)
 
 
 @bottle.post('/incantation')
@@ -175,6 +206,7 @@ def craft_incantation_view():
 
 
 @bottle.get('/incantation/<id>')
+@html()
 def incantation_view(id):
     incantation = master().incantation(id)
     form = f'<form action="/incantation/{id}/override" method="post">'
@@ -239,6 +271,7 @@ def incantation_delete_view(id):
 
 
 @bottle.post('/wish')
+@html()
 def wish_view():
     text = bottle.request.forms.get('text')
     match master().wish(text):
@@ -250,10 +283,10 @@ def wish_view():
             )
             return bottle.redirect(f'/incantation/{incantation.id}?mishap=true')
         case result:
-            return f'''
-            <a href="/">back</a>
-            {result}
-            '''
+            return bottle.template('''
+                <a href="/">back</a>
+                <p>{{result}}</p>
+            ''', result=result)
 
 
 @bottle.get('/mishap/<id>/fix')
@@ -267,16 +300,18 @@ def mishap_fix_view(id):
 
 
 @bottle.get('/mishap/<id>/retry')
+@html()
 def mishap_retry_view(id):
     mishap = master().mishap(id)
     result = mishap.retry()
     if isinstance(result, Exception):
         return bottle.redirect(f'/incantation/{mishap.incantation.id}?mishap=true')
     else:
-        return f'''
+        return bottle.template('''
             <a href="/">back</a>
-            {result}
-            '''
+            <p>{{result}}</p>
+        ''', result=result)
+
 
 @bottle.get('/mishap/<id>/erase')
 def mishap_erase_view(id):
@@ -286,6 +321,7 @@ def mishap_erase_view(id):
 
 
 @bottle.get('/mishap/<id>/fix_and_retry')
+@html()
 def mishap_fix_and_retry_view(id):
     mishap = master().mishap(id)
     result = mishap.fix()
@@ -296,24 +332,10 @@ def mishap_fix_and_retry_view(id):
         if isinstance(result, Exception):
             return bottle.redirect(f'/incantation/{mishap.incantation.id}?mishap=true')
         else:
-            return f'''
-            <a href="/">back</a>
-            {result}
-            '''
-
-
-@bottle.post('/api/incantation')
-def api_craft_incantation_view():
-    text = json.loads(bottle.request.body.read().decode('utf-8'))['text']
-    try:
-        incantation = api_master().craft_incantation(text)
-    except Exception as e:
-        Incident.create(
-            type='craft',
-            traceback=''.join(traceback.format_exception(e, limit=-2))
-        )
-        return 'Error'
-    return json.dumps({'id': incantation.id, 'name': incantation.name})
+            return bottle.template('''
+                <a href="/">back</a>
+                <p>{{result}}</p>
+            ''', result=result)
 
 
 @bottle.post('/api/wish')

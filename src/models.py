@@ -172,6 +172,10 @@ class Incantation(macaron.Model, BaseModel):
         self.schema = json.dumps(new_schema)
         self.save()
 
+    @property
+    def description(self):
+        return json.loads(self.schema)['function']['description']
+
 
 class Mishap(macaron.Model, BaseModel):
     incantation = macaron.ManyToOne(Incantation, fkey='incantation_id', ref_key='id', related_name='mishaps')
@@ -272,6 +276,8 @@ class Config(macaron.Model, BaseModel):
 
     @classmethod
     def _after_create(cls):
+        from constants import CSS
+
         initial_config = (
             ('code_phrase_salt',
              ''.join(random.choices(string.ascii_letters + string.digits, k=32))),
@@ -279,6 +285,7 @@ class Config(macaron.Model, BaseModel):
             ('openai_model', 'gpt-4-1106-preview'),
             ('manual_incantation_crafting', '0'),
             ('craft_retries', '3'),
+            ('css', CSS),
         )
         for key, value in initial_config:
             if cls.get_value(key) is None:

@@ -3,7 +3,12 @@ import inspect
 import traceback
 import functools
 
-from openai import OpenAI
+try:
+    from openai import OpenAI
+except ImportError:
+    import pip
+    pip.main(['install', 'openai==1.3.5'])
+    from openai import OpenAI
 
 from constants import OPENAI_FUNCTION_SCHEMA, CRAFT_INCANTATION_SCHEMA
 from utils import unwrap_content, define_function, NoDefaults
