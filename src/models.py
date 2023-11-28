@@ -95,12 +95,17 @@ class Master(macaron.Model, BaseModel):
             pass
 
     def craft_incantation(self, text):
-        name, code = craft_incantation(text)
+        name, code = craft_incantation(
+            Config.get_value('openai_key'), Config.get_value('openai_model'),
+            Config.get_value('craft_retries', 3), text
+        )
         return self.incantations.append(
             request=text,
             name=name,
             code=code,
-            schema=describe_function(code),
+            schema=describe_function(
+                Config.get_value('openai_key'), Config.get_value('openai_model'), code
+            ),
             overrides='{}'
         )
 
@@ -114,7 +119,10 @@ class Master(macaron.Model, BaseModel):
             }
             for incantation in Incantation.select("master_id=? OR public=TRUE", [self.id])
         }
-        return wish(text, incantations, allow_craft=allow_craft)
+        return wish(
+            Config.get_value('openai_key'), Config.get_value('openai_model'), text,
+            incantations, allow_craft=allow_craft
+        )
 
     def wish(self, text):
         match ret := self._wish(text, allow_craft=True):
@@ -176,6 +184,12 @@ class Incantation(macaron.Model, BaseModel):
     def description(self):
         return json.loads(self.schema)['function']['description']
 
+    def redescribe(self):
+        self.schema = describe_function(
+            Config.get_value('openai_key'), Config.get_value('openai_model'), self.code
+        )
+        self.save()
+
 
 class Mishap(macaron.Model, BaseModel):
     incantation = macaron.ManyToOne(Incantation, fkey='incantation_id', ref_key='id', related_name='mishaps')
@@ -195,15 +209,18 @@ class Mishap(macaron.Model, BaseModel):
     """
 
     def fix(self):
-        result = fix(self)
+        result = fix(
+            Config.get_value('openai_key'), Config.get_value('openai_model'),
+            self.code, self.request, self.traceback
+        )
         if isinstance(result, Exception):
             return result
-        else:
-            incantation = self.incantation
-            incantation.code = result
-            incantation.schema = describe_function(result)
-            incantation.save()
-            return self
+        self.incantation.code = result
+        self.incantation.schema = describe_function(
+            Config.get_value('openai_key'), Config.get_value('openai_model'), result
+        )
+        self.incantation.save()
+        return self
 
     def retry(self):
         # reload code

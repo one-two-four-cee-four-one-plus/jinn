@@ -1,7 +1,6 @@
 import json
 import inspect
 import traceback
-import functools
 
 try:
     from openai import OpenAI
@@ -14,32 +13,22 @@ from constants import OPENAI_FUNCTION_SCHEMA, CRAFT_INCANTATION_SCHEMA
 from utils import unwrap_content, define_function, NoDefaults
 
 
-@functools.lru_cache
-def client():
-    from models import Config
-    return OpenAI(api_key=Config.get_value('openai_key'))
-
-
-def describe_function(code):
-    from models import Config
-
-    response = client().chat.completions.create(
-        model=Config.get_value('openai_model'),
+def describe_function(key, model, code):
+    response = OpenAI(api_key=key).chat.completions.create(
+        model=model,
         temperature=0,
         messages=[{
             "role": "user",
             "content": (
                 f"Describe this python function: {code} in this schema {OPENAI_FUNCTION_SCHEMA}. "
-                "I want only json in response, nothing else"
+                "I want only json in response, nothing else."
             )
         }]
     )
     return unwrap_content(response.choices[0].message.content, 'json')
 
 
-def craft_incantation(text):
-    from models import Config
-
+def craft_incantation(key, model, retries, text):
     messages = [{
         "role": "user",
         "content": (
@@ -62,15 +51,15 @@ def craft_incantation(text):
             f"{text}"
         )
     }]
-    response = client().chat.completions.create(
-        model=Config.get_value('openai_model'),
+    response = OpenAI(api_key=key).chat.completions.create(
+        model=model,
         messages=messages,
         temperature=0
     )
     messages.append({"role": "assistant", "content": response.choices[0].message.content})
 
     last_e = None
-    for i in range(int(Config.get_value('craft_retries', 3))):
+    for i in range(int(retries)):
         code = unwrap_content(response.choices[0].message.content, 'python')
         code = NoDefaults.in_(code)
         try:
@@ -90,9 +79,7 @@ def craft_incantation(text):
         return last_e
 
 
-def wish(text, incantations, allow_craft=False):
-    from models import Config
-
+def wish(key, model, text, incantations, allow_craft=False):
     tools = [value['schema'] for value in incantations.values()]
     instructions = ' Use external tool.'
     if allow_craft:
@@ -102,8 +89,8 @@ def wish(text, incantations, allow_craft=False):
             ' the original request. The tool should be generic enough to be useful in'
             ' other situations.'
         )
-    response = client().chat.completions.create(
-        model=Config.get_value('openai_model'),
+    response = OpenAI(api_key=key).chat.completions.create(
+        model=model,
         temperature=0,
         messages=[{
             "role": "user",
@@ -129,22 +116,20 @@ def wish(text, incantations, allow_craft=False):
         return response_message.content
 
 
-def fix(mishap):
-    from models import Config
-
-    _, func = define_function(mishap.incantation.code)
+def fix(key, model, code, request, traceback):
+    _, func = define_function(code)
     arguments = set(inspect.getargspec(func).args)
-    arguments = {k: v for k, v in json.loads(mishap.request).items() if k in arguments}
+    arguments = {k: v for k, v in json.loads(request).items() if k in arguments}
     arguments = json.dumps(arguments)
-    response = client().chat.completions.create(
-        model=Config.get_value('openai_model'),
+    response = OpenAI(api_key=key).chat.completions.create(
+        model=model,
         temperature=0,
         messages=[{"role": "user", "content": (
             "I need you to fix python function. I will provide it's code, call"
             " arguments formatted in some json schema and error traceback. Fix"
             " this error. I want only python code in response, nothing else."
-            f" Code:\n{mishap.code}\nArguments:\n{arguments}\n"
-            f"Traceback:\n{mishap.traceback}"
+            f" Code:\n{code}\nArguments:\n{arguments}\n"
+            f"Traceback:\n{traceback}"
         )}]
     )
     code = unwrap_content(response.choices[0].message.content, 'python')

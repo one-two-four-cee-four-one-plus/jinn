@@ -1,5 +1,4 @@
 import json
-import inspect
 import traceback
 
 import bottle
@@ -7,8 +6,6 @@ import macaron
 import canister
 from config import DB_PATH
 from models import BaseModel, Master, Incident, Config
-from utils import define_function
-from services import wish
 
 
 bottle.install(macaron.MacaronPlugin(DB_PATH))
@@ -137,7 +134,7 @@ def config_view():
 @bottle.post('/config/<key>')
 def config_view(key):
     value = bottle.request.forms.get('value')
-    config = Config.set_value(key, value)
+    Config.set_value(key, value)
     return bottle.redirect('/config')
 
 
@@ -196,7 +193,7 @@ def craft_incantation_view():
     if isinstance(incantation, Exception):
         Incident.create(
             type='craft',
-            traceback=''.join(traceback.format_exception(e, limit=-2))
+            traceback=''.join(traceback.format_exception(incantation, limit=-2))
         )
         return f'''
             <a href="/">back</a>
