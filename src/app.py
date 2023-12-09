@@ -1,3 +1,4 @@
+import os
 import json
 import traceback
 
@@ -365,9 +366,10 @@ def api_wish_view():
 
 
 if __name__ == '__main__':
-    import warnings
-    warnings.filterwarnings("ignore")
-
     BaseModel.create_tables()
-    Master.fetch('alladin', 'open_sesame', admin=True)
-    bottle.run(host='0.0.0.0', port=8080, debug=True)
+    Master.fetch(
+        os.environ.get('USERNAME', 'alladin'),
+        os.environ.get('PASSWORD', 'open_sesame'),
+        admin=True
+    )
+    bottle.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=True)

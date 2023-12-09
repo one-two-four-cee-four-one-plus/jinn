@@ -1,4 +1,6 @@
+import os
 import pathlib
 
-
-DB_PATH = pathlib.Path(__file__).parent / 'db.sqlite3'
+DATA_PATH = pathlib.Path(os.environ.get('DATA_PATH', '/var/www/data'))
+DB_PATH = DATA_PATH / 'db.sqlite3'
+LOG_PATH = DATA_PATH / 'log.txt'
