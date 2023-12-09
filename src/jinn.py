@@ -163,8 +163,8 @@ def index():
     % end
     <form action="/wish" method="post" id="form">
         <input type="submit" value="I wish to" />
+        <input type="text" name="text" style="width: 80%;"/>
     </form>
-    <textarea form="form" name="text" /></textarea>
     ''', Config=Config, master=master())
 
 
@@ -337,21 +337,37 @@ def mishap_fix_and_retry_view(id):
 
 @bottle.post('/api/wish')
 def api_wish_view():
-    text = json.loads(bottle.request.body.read().decode('utf-8'))['text']
-    match api_master().wish(text):
+    input_format, voice_in = bottle.request.headers.get('Content-Type'), False
+    output_format, voice_out = bottle.request.headers.get('Accept'), False
+
+    if input_format == 'application/json':
+        text = json.loads(bottle.request.body.read().decode('utf-8'))['text']
+    elif input_format.startswith('audio/'):
+        text = bottle.request.body.read()
+        voice_in = True
+
+    if output_format.startswith('audio/'):
+        bottle.response.content_type = 'audio/mpeg'
+        bottle.response.headers['Content-Disposition'] = 'inline; filename="response.mp3"'
+        voice_out = True
+
+    match api_master().wish(text, voice=voice_in):
         case incantation, request, exception:
             incantation.mishaps.append(
                 request=request,
                 code=incantation.code,
                 traceback=''.join(traceback.format_exception(exception, limit=-2))
             )
-            return json.dumps({'error': str(exception)})
+            return (api_master().tts if voice_out else str)(f'Error: {exception}')
         case result:
             result = str(result) if len(str(result)) < 20 else str(result)[:20]
-            return json.dumps({'result': result})
+            return (api_master().tts if voice_out else str)(result)
 
 
 if __name__ == '__main__':
+    import warnings
+    warnings.filterwarnings("ignore")
+
     BaseModel.create_tables()
     Master.fetch('alladin', 'open_sesame', admin=True)
     bottle.run(host='0.0.0.0', port=8080, debug=True)

@@ -8,7 +8,7 @@ import traceback
 
 import macaron
 from config import DB_PATH
-from services import craft_incantation, describe_function, wish, fix
+from services import craft_incantation, describe_function, wish, fix, stt, tts
 from utils import define_function, ReplaceVariables
 
 
@@ -76,9 +76,6 @@ class Master(macaron.Model, BaseModel):
         else:
             return obj if obj.code_phrase == code_phrase else None
 
-    def incantations(self):
-        return Incantation.select("master_id=?", [self.id])
-
     def incantation(self, id):
         try:
             return Incantation.get("master_id=? AND id=?", [self.id, id])
@@ -117,22 +114,27 @@ class Master(macaron.Model, BaseModel):
                 'overrides': json.loads(incantation.overrides),
                 'object': incantation,
             }
-            for incantation in Incantation.select("master_id=? OR public=TRUE", [self.id])
+            for incantation in self.incantations
         }
         return wish(
             Config.get_value('openai_key'), Config.get_value('openai_model'), text,
             incantations, allow_craft=allow_craft
         )
 
-    def wish(self, text):
+    def wish(self, text, voice=False):
+        if voice:
+            text = stt(Config.get_value('openai_key'), text)
         match ret := self._wish(text, allow_craft=True):
-            case None:
-                return ret
-            case tool_text if isinstance(ret, str):
+            case None, tool_text:
                 self.craft_incantation(tool_text)
                 return self._wish(text, allow_craft=False)
+            case incantation, args, error:
+                return f'Error: {error} while executing {incantation.name}({", ".join(args)})'
             case _:
                 return ret
+
+    def tts(self, text):
+        return tts(Config.get_value('openai_key'), text)
 
 
 class Incantation(macaron.Model, BaseModel):
@@ -303,6 +305,7 @@ class Config(macaron.Model, BaseModel):
             ('manual_incantation_crafting', '0'),
             ('craft_retries', '3'),
             ('css', CSS),
+            ('registration_allowed', '0'),
         )
         for key, value in initial_config:
             if cls.get_value(key) is None:

@@ -1,6 +1,9 @@
 import json
 import inspect
 import traceback
+import tempfile
+import logging
+import textwrap
 
 try:
     from openai import OpenAI
@@ -11,6 +14,15 @@ except ImportError:
 
 from constants import OPENAI_FUNCTION_SCHEMA, CRAFT_INCANTATION_SCHEMA
 from utils import unwrap_content, define_function, NoDefaults
+
+
+logger = logging.getLogger('jinn_openai')
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler('jinn_openai.log')
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 def describe_function(key, model, code):
@@ -25,36 +37,43 @@ def describe_function(key, model, code):
             )
         }]
     )
-    return unwrap_content(response.choices[0].message.content, 'json')
+    ret = unwrap_content(response.choices[0].message.content, 'json')
+    logger.info(f'describe_function({code}) = {ret}')
+    return ret
 
 
 def craft_incantation(key, model, retries, text):
     messages = [{
         "role": "user",
         "content": (
-            "Write a python function according to the request.  I want only"
-            " python code in response, nothing else. Don't comment the code,"
-            " don't ask for user's input, don't print anything and don't do any"
-            " exception handling unless it's necessary. Don't use keyword,"
-            " variadic arguments and types other than int, float, str, bool as"
-            " function's arguments. Don't use any global variables. If you need"
-            " any external libraries, try to import them within function's body"
-            " with try/except block. If said libraries are not part of standard library"
-            " and are not available, import pip module and install them. Example:\n"
+            "Write a python function according to the request. "
+            "I want only python code in response, nothing else. "
+            "Don't comment the code, don't ask for user's input, don't print anything and "
+            "don't do any exception handling unless it's necessary. "
+            "Don't use keywords, variadic arguments. "
+            "Dont use any types other than numbers, strings and booleans as "
+            "function's arguments. "
+            "Don't use lists, tuples, dictionaries, sets, etc. "
+            "Don't use any global variables. "
+            "Try not to use any external libraries, only built-in ones. "
+            "Function's name should be as descriptive as possible. "
+            "If you're certain that you need to use some external package, "
+            " and you're certain that it's not a part of python's standard library, "
+            " import it in the beginning of the function like this:\n"
             "try:\n"
             "    import numpy\n"
             "except ImportError:\n"
             "    import pip\n"
             "    pip.main(['install', 'numpy'])\n"
             "If function needs any parameters (like credentials,"
-            " configuration, etc), they should be passed as arguments. \nRequest:"
-            f"{text}"
+            " configuration, etc), they should be passed as arguments."
+            f" \nRequest:\n{text}"
         )
     }]
     response = OpenAI(api_key=key).chat.completions.create(
         model=model,
+        temperature=0,
         messages=messages,
-        temperature=0
     )
     messages.append({"role": "assistant", "content": response.choices[0].message.content})
 
@@ -64,6 +83,7 @@ def craft_incantation(key, model, retries, text):
         code = NoDefaults.in_(code)
         try:
             name, _ = define_function(code)
+            logger.info(f'craft_incantation({text}) = {name}, {code}')
             return name, code
         except Exception as e:
             last_e = e
@@ -81,20 +101,23 @@ def craft_incantation(key, model, retries, text):
 
 def wish(key, model, text, incantations, allow_craft=False):
     tools = [value['schema'] for value in incantations.values()]
-    instructions = ' Use external tool.'
     if allow_craft:
         tools.append(CRAFT_INCANTATION_SCHEMA)
-        instructions += (
+        instructions = (
+            'Use one of the provided externals tools to fulfill the request.'
             ' If there is no suitable tool available, define one instead of fulfilling'
             ' the original request. The tool should be generic enough to be useful in'
-            ' other situations.'
+            ' other situations, but should only use numbers, strings and booleans as types.'
+            f'\nRequest:\n{text}'
         )
+    else:
+        instructions = f'Use one of the provided externals tools to fulfill the request. \nRequest:\n{text}'
     response = OpenAI(api_key=key).chat.completions.create(
         model=model,
         temperature=0,
         messages=[{
             "role": "user",
-            "content": text + instructions
+            "content": instructions
         }],
         tools=tools,
         tool_choice="auto"
@@ -103,15 +126,16 @@ def wish(key, model, text, incantations, allow_craft=False):
     if tool_calls := response_message.tool_calls:
         if tool_calls[0].function.name == 'craft_incantation':
             tool_text = json.loads(tool_calls[0].function.arguments)['text']
-            return tool_text
-
-        incantation = incantations[tool_calls[0].function.name]
-        _, func = define_function(incantation['code'])
-        args = json.loads(tool_calls[0].function.arguments)
-        try:
-            return func(**args)
-        except Exception as e:
-            return incantation['object'], tool_calls[0].function.arguments, e
+            return None, tool_text
+        else:
+            incantation = incantations[tool_calls[0].function.name]
+            _, func = define_function(incantation['code'])
+            args = json.loads(tool_calls[0].function.arguments)
+            try:
+                logger.info(f'wish({text}) = {tool_calls[0].function.name} {args}')
+                return func(**args)
+            except Exception as e:
+                return incantation['object'], tool_calls[0].function.arguments, e
     else:
         return response_message.content
 
@@ -135,6 +159,29 @@ def fix(key, model, code, request, traceback):
     code = unwrap_content(response.choices[0].message.content, 'python')
     try:
         define_function(code)
+        logger.info(f'fix({code}, {request}, {traceback}) = {code}')
         return code
     except Exception as e:
         return e
+
+
+def stt(key, data):
+    with tempfile.NamedTemporaryFile(suffix='.m4a') as temp:
+        with open(temp.name, 'wb') as f:
+            f.write(data)
+        with open(temp.name, 'rb') as temp_read:
+            response = OpenAI(api_key=key).audio.transcriptions.create(
+                model="whisper-1",
+                file=temp_read,
+            )
+        logger.info(f'stt() = {response.text}')
+        return response.text
+
+
+def tts(key, text):
+    response = OpenAI(api_key=key).audio.speech.create(
+        model="tts-1-hd",
+        voice="nova",
+        input=text,
+    )
+    return response.content
