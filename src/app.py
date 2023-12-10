@@ -274,7 +274,7 @@ def incantation_delete_view(id):
     incantation = master().incantation(id)
     incantation.mishaps.delete()
     incantation.delete()
-    return bottle.redirect('/')
+    return bottle.redirect('/incantations')
 
 
 @bottle.post('/wish')
