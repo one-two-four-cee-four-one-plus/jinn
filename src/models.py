@@ -8,7 +8,7 @@ import traceback
 
 import macaron
 from config import DB_PATH
-from services import craft_incantation, describe_function, wish, fix, stt, tts
+from services import craft_incantation, describe_function, wish, fix, adjust, stt, tts
 from utils import define_function, ReplaceVariables
 
 
@@ -181,6 +181,21 @@ class Incantation(macaron.Model, BaseModel):
             new_schema['function']['parameters']['required'].remove(key)
         self.schema = json.dumps(new_schema)
         self.save()
+
+    def adjust(self, reason, update_schema=False):
+        result = adjust(
+            Config.get_value('openai_key'), Config.get_value('openai_model'),
+            self.code, reason
+        )
+        if isinstance(result, Exception):
+            return result
+        self.code = result
+        if update_schema:
+            self.schema = describe_function(
+                Config.get_value('openai_key'), Config.get_value('openai_model'), result
+            )
+        self.save()
+        return self
 
     @property
     def description(self):

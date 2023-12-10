@@ -136,7 +136,38 @@ def wish(key, model, text, incantations, allow_craft=False):
         return response_message.content
 
 
+def adjust(key, model, code, reason):
+    instructions = (
+        "I need you to adjust the python function according to the request. "
+        "I will provide it's code and the reason why it needs to be adjusted. "
+        "You shouldn't change the function's name, arguments, return type, "
+        " and you shouldn't add any new arguments. "
+        "It should serve the same purpose as the original function. "
+        "I want only python code in response, nothing else."
+        f" Code:\n{code}\nReason:\n{reason}"
+    )
+    response = OpenAI(api_key=key).chat.completions.create(
+        model=model,
+        temperature=0,
+        messages=[{"role": "user", "content": instructions}],
+    )
+    code = unwrap_content(response.choices[0].message.content, 'python')
+    try:
+        define_function(code)
+        logger.info(f'adjust({code}, {reason}) = {code}')
+        return code
+    except Exception as e:
+        return e
+
+
 def fix(key, model, code, request, traceback):
+    instructions = (
+        "I need you to fix python function. I will provide it's code, call"
+        " arguments formatted in some json schema and error traceback. Fix"
+        " this error. I want only python code in response, nothing else."
+        f" Code:\n{code}\nArguments:\n{request}\n"
+        f"Traceback:\n{traceback}"
+    )
     _, func = define_function(code)
     arguments = set(inspect.getargspec(func).args)
     arguments = {k: v for k, v in json.loads(request).items() if k in arguments}
@@ -144,13 +175,7 @@ def fix(key, model, code, request, traceback):
     response = OpenAI(api_key=key).chat.completions.create(
         model=model,
         temperature=0,
-        messages=[{"role": "user", "content": (
-            "I need you to fix python function. I will provide it's code, call"
-            " arguments formatted in some json schema and error traceback. Fix"
-            " this error. I want only python code in response, nothing else."
-            f" Code:\n{code}\nArguments:\n{arguments}\n"
-            f"Traceback:\n{traceback}"
-        )}]
+        messages=[{"role": "user", "content": instructions}],
     )
     code = unwrap_content(response.choices[0].message.content, 'python')
     try:

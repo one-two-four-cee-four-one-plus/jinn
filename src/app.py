@@ -224,6 +224,7 @@ def incantation_view(id):
             <br />
         '''
     form += '<input type="submit" value="Update overrides" />'
+    form += '</form>'
     mishaps = ''
     for mishap in incantation.mishaps:
         mishap_request = {k: v for k, v in json.loads(mishap.request).items() if k in incantation.parameters}
@@ -235,6 +236,18 @@ def incantation_view(id):
         <a href="/mishap/{mishap.id}/erase">erase</a>
         <a href="/mishap/{mishap.id}/fix_and_retry">fix & retry</a>
         '''
+
+    adjust = f'''
+        <form action="/incantation/{id}/adjust" method="post">
+            <label for="reason">reason</label>
+            <input type="text" name="reason" />
+            <br />
+            <label for="update_schema">update schema</label>
+            <input type="checkbox" name="update_schema" />
+            <br />
+            <input type="submit" value="Adjust" />
+        </form>
+    '''
 
     return f'''
         <a href="/">back</a>
@@ -252,6 +265,10 @@ def incantation_view(id):
             <summary>overrides</summary>
             {form}
         </details>
+        <details>
+            <summary>adjust</summary>
+            {adjust}
+        </details>
         {mishaps}
     '''
 
@@ -266,6 +283,24 @@ def incantation_override_view(id):
             type='override',
             traceback=''.join(traceback.format_exception(e, limit=-2))
         )
+    return bottle.redirect(f'/incantation/{id}')
+
+
+@bottle.post('/incantation/<id>/adjust')
+def incantation_adjust_view(id):
+    reason = bottle.request.forms.get('reason')
+    update_schema = bottle.request.forms.get('update_schema') == 'on'
+    incantation = master().incantation(id)
+    result = incantation.adjust(reason, update_schema)
+    if isinstance(result, Exception):
+        Incident.create(
+            type='adjust',
+            traceback=''.join(traceback.format_exception(result, limit=-2))
+        )
+        return f'''
+            <a href="/">back</a>
+            <p>{result}</p>
+        '''
     return bottle.redirect(f'/incantation/{id}')
 
 
