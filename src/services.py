@@ -5,12 +5,7 @@ import tempfile
 import logging
 import textwrap
 
-try:
-    from openai import OpenAI
-except ImportError:
-    import pip
-    pip.main(['install', 'openai==1.3.5'])
-    from openai import OpenAI
+from openai import OpenAI
 
 from constants import OPENAI_FUNCTION_SCHEMA, CRAFT_INCANTATION_SCHEMA
 from utils import unwrap_content, define_function, NoDefaults
@@ -58,8 +53,8 @@ def craft_incantation(key, model, retries, text):
             "Try not to use any external libraries, only built-in ones. "
             "Function's name should be as descriptive as possible. "
             "If you're certain that you need to use some external package, "
-            " and you're certain that it's not a part of python's standard library, "
-            " import it in the beginning of the function like this:\n"
+            "that it's not a part of python's standard library, "
+            "import it in the beginning of the function like this:\n"
             "try:\n"
             "    import numpy\n"
             "except ImportError:\n"

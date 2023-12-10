@@ -264,6 +264,7 @@ def incantation_override_view(id):
 @bottle.get('/incantation/<id>/delete')
 def incantation_delete_view(id):
     incantation = master().incantation(id)
+    incantation.mishaps.delete()
     incantation.delete()
     return bottle.redirect('/')
 
