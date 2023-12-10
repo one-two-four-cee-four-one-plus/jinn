@@ -5,7 +5,7 @@ import traceback
 import bottle
 import macaron
 import canister
-from config import DB_PATH
+from config import DB_PATH, LOG_PATH
 from models import BaseModel, Master, Incident, Config
 
 
@@ -147,6 +147,13 @@ def flip_verification_view(id):
     return bottle.redirect('/config')
 
 
+@bottle.get('/log')
+@html()
+def log_view():
+    with open(LOG_PATH, 'rt') as f:
+        return f.read().replace('\n', '<br>').replace(' ', '&nbsp;')
+
+
 @bottle.get('/')
 @html()
 def index():
@@ -154,6 +161,7 @@ def index():
     <a href="/incantations">incantations</a>
     % if master.admin:
         <a href='/config'>config</a>
+        <a href='/log'>log</a>
     % end
     <a href="/logout">logout</a>
     % if Config.check('manual_incantation_crafting'):
