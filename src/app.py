@@ -255,7 +255,10 @@ def incantation_view(id):
         <p>{incantation.request}</p>
         <details>
             <summary>code</summary>
-            <pre>{incantation.code}</pre>
+            <form action="/incantation/{id}/code" method="post">
+                <textarea name="code" style="width: 100%; height: 300px;">{incantation.code}</textarea>
+                <input type="submit" value="Update code" />
+            </form>
         </details>
         <details>
             <summary>schema</summary>
@@ -301,6 +304,14 @@ def incantation_adjust_view(id):
             <a href="/">back</a>
             <p>{result}</p>
         '''
+    return bottle.redirect(f'/incantation/{id}')
+
+
+@bottle.post('/incantation/<id>/code')
+def incantation_code_view(id):
+    incantation = master().incantation(id)
+    incantation.code = bottle.request.forms.get('code')
+    incantation.save()
     return bottle.redirect(f'/incantation/{id}')
 
 
