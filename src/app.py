@@ -372,4 +372,5 @@ if __name__ == '__main__':
         os.environ.get('PASSWORD', 'open_sesame'),
         admin=True
     )
-    bottle.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=True)
+else:
+    app = application = bottle.default_app()
