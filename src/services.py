@@ -9,11 +9,12 @@ from openai import OpenAI
 
 from constants import OPENAI_FUNCTION_SCHEMA, CRAFT_INCANTATION_SCHEMA
 from utils import unwrap_content, define_function, NoDefaults
+from config import LOG_PATH
 
 
 logger = logging.getLogger('jinn_openai')
 logger.setLevel(logging.INFO)
-handler = logging.FileHandler('jinn_openai.log')
+handler = logging.FileHandler(LOG_PATH)
 handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(message)s')
 handler.setFormatter(formatter)
@@ -53,13 +54,13 @@ def craft_incantation(key, model, retries, text):
             "Try not to use any external libraries, only built-in ones. "
             "Function's name should be as descriptive as possible. "
             "If you're certain that you need to use some external package, "
-            "that it's not a part of python's standard library, "
+            "and that package is not a part of python's standard library, "
             "import it in the beginning of the function like this:\n"
             "try:\n"
-            "    import numpy\n"
+            "    import requests\n"
             "except ImportError:\n"
             "    import pip\n"
-            "    pip.main(['install', 'numpy'])\n"
+            "    pip.main(['install', 'requests'])\n"
             "If function needs any parameters (like credentials,"
             " configuration, etc), they should be passed as arguments."
             f" \nRequest:\n{text}"

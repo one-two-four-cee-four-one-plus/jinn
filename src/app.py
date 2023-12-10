@@ -362,7 +362,6 @@ def api_wish_view():
             )
             return (api_master().tts if voice_out else str)(f'Error: {exception}')
         case result:
-            result = str(result) if len(str(result)) < 20 else str(result)[:20]
             return (api_master().tts if voice_out else str)(result)
 
 
