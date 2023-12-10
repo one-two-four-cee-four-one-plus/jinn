@@ -11,15 +11,11 @@ Since Jinn can ocasionally install new packages, it is recommended to run it in 
 ```bash
 docker build -t jinn .
 ```
-Then run the container like this once. This will create a new user and set up the database
+Then run the container like this
 ```bash
 docker run --rm -v /path/to/local/data:/var/www/data -e USER=user -e PASSWORD=pass jinn python src/app.py
 ```
-After that you can run the container like this:
-```bash
-docker run -d -p 8080:8080 -v /path/to/local/data:/var/www/data jinn
-```
-Jinn uses /var/www/data to store sqlite3 database and logs. You can mount it to a local directory to preserve data between container restarts.
+Jinn uses /var/www/data to store sqlite3 database and logs. You can mount it to a local directory to preserve data between container restarts. USER and PASSWORD environment variables are used to create an admin user.
 
 ### Usage
 Jinn tries to fulfill user's wish by using various python functions generated for previous requests or tailored specifically for current one. This means that you should directly prompt Jinn to do what you want it to do. You don't ask a question, like you do with chatGPT.

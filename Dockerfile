@@ -5,4 +5,4 @@ COPY . /app
 
 RUN pip install -r requirements.txt && mkdir -p /var/www/data
 
-CMD ["uwsgi", "--ini", "uwsgi.ini"]
+CMD ["python", "src/app.py"]
