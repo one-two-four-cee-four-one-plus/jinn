@@ -111,7 +111,7 @@ def wish(key, model, text, incantations, allow_craft=False):
         instructions = (
             'Use one of the provided externals tools to fulfill the request. '
             ' If the request has a word "question" in the beginning, just answer it shortly.'
-            '\nRequest:\n{text}'
+            f'\nRequest:\n{text}'
         )
     response = OpenAI(api_key=key).chat.completions.create(
         model=model,
@@ -160,8 +160,8 @@ def adjust(key, model, code, reason):
     )
     code = unwrap_content(response.choices[0].message.content, 'python')
     try:
-        define_function(code)
-        logger.info(f'adjust({code}, {reason}) = {code}')
+        name, _ = define_function(code)
+        logger.info(f'adjust({name}, {reason}) = {code}')
         return code
     except Exception as e:
         return e
