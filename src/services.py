@@ -95,7 +95,7 @@ def craft_incantation(key, model, retries, text):
         return last_e
 
 
-def wish(key, model, text, incantations, allow_craft=False):
+def wish(key, model, text, incantations, allow_craft=False, call=True):
     tools = [value['schema'] for value in incantations.values()]
     if allow_craft:
         tools.append(CRAFT_INCANTATION_SCHEMA)
@@ -126,18 +126,20 @@ def wish(key, model, text, incantations, allow_craft=False):
     response_message = response.choices[0].message
     if tool_calls := response_message.tool_calls:
         if tool_calls[0].function.name == 'craft_incantation':
-            tool_text = json.loads(tool_calls[0].function.arguments)['text']
-            logger.info(f'wish({text}) = craft_incantation({tool_text})')
-            return None, tool_text
-        else:
-            incantation = incantations[tool_calls[0].function.name]
-            _, func = define_function(incantation['code'])
-            args = json.loads(tool_calls[0].function.arguments)
+            logger.info(f'wish({text}) = craft_incantation{tool_calls[0].function.arguments}')
+            return 'craft_incantation', tool_calls[0].function.arguments
+        elif call:
             try:
+                incantation = incantations[tool_calls[0].function.name]
+                _, func = define_function(incantation['code'])
+                args = json.loads(tool_calls[0].function.arguments)
                 logger.info(f'wish({text}) = {tool_calls[0].function.name} {args}')
                 return func(**args)
             except Exception as e:
                 return incantation['object'], tool_calls[0].function.arguments, e
+        else:
+            logger.info(f'wish({text}) = {tool_calls[0].function.name}{tool_calls[0].function.arguments}')
+            return incantations[tool_calls[0].function.name], tool_calls[0].function.arguments
     else:
         logger.info(f'wish({text}) = {response_message.content}')
         return response_message.content

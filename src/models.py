@@ -106,7 +106,7 @@ class Master(macaron.Model, BaseModel):
             overrides='{}'
         )
 
-    def _wish(self, text, allow_craft=False):
+    def _wish(self, text, allow_craft=False, call=True):
         incantations = {
             incantation.name: {
                 'code': incantation.code,
@@ -118,14 +118,14 @@ class Master(macaron.Model, BaseModel):
         }
         return wish(
             Config.get_value('openai_key'), Config.get_value('openai_model'), text,
-            incantations, allow_craft=allow_craft
+            incantations, allow_craft=allow_craft, call=call
         )
 
     def wish(self, text, voice=False):
         if voice:
             text = stt(Config.get_value('openai_key'), text)
         match ret := self._wish(text, allow_craft=True):
-            case None, tool_text:
+            case 'craft_incantation', tool_text:
                 self.craft_incantation(tool_text)
                 return self._wish(text, allow_craft=False)
             case incantation, args, error:
@@ -135,6 +135,46 @@ class Master(macaron.Model, BaseModel):
 
     def tts(self, text):
         return tts(Config.get_value('openai_key'), text)
+
+    def stt(self, audio):
+        return stt(Config.get_value('openai_key'), audio)
+
+    def prepare(self, text):
+        match ret := self._wish(text, allow_craft=True, call=False):
+            case 'craft_incantation', tool_text:
+                text = f'craft_incantation("{json.loads(tool_text)["text"]}")'
+                return {
+                    'craft_incantation': json.loads(tool_text)['text'],
+                    'wish': text,
+                    'text': text,
+                }
+            case incantation, args:
+                return {
+                    'incantation': incantation['object'].id,
+                    'args': args,
+                    'text': f'{incantation["object"].name}{args})',
+                }
+
+    def craft_and_prepare(self, data):
+        self.craft_incantation(data['craft_incantation'])
+        incantation, args = self._wish(data['wish'], allow_craft=False, call=False)
+        text = f'{incantation["object"].name}{", ".join(args)}'
+        return {'incantation': incantation['object'].id, 'args': args, 'text': text}
+
+    def execute(self, data):
+        incantation = self.incantation(data['incantation'])
+        _, func = define_function(incantation.code)
+        return {'result': func(**json.loads(data['args']))}
+
+    def proceed(self, data):
+        if 'result' in data:
+            return data
+        if 'craft_incantation' in data:
+            return self.craft_and_prepare(data)
+        elif 'incantation' in data:
+            return self.execute(data)
+        else:
+            return self.prepare(data['text'])
 
 
 class Incantation(macaron.Model, BaseModel):

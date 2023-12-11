@@ -391,6 +391,28 @@ def mishap_fix_and_retry_view(id):
             ''', result=result)
 
 
+@bottle.post('/api/stt')
+def api_stt_view():
+    speech = bottle.request.body.read()
+    text = api_master().stt(speech)
+    return json.dumps({'text': text})
+
+
+@bottle.post('/api/prepare')
+def api_prepare_view():
+    text = json.loads(bottle.request.body.read().decode('utf-8'))['text']
+    result = api_master().prepare(text)
+    return json.dumps(result)
+
+
+@bottle.post('/api/proceed')
+def api_craft_and_prepare_view():
+    data = json.loads(bottle.request.body.read().decode('utf-8'))
+    result = api_master().proceed(data)
+    print(data, result)
+    return json.dumps(result)
+
+
 @bottle.post('/api/wish')
 def api_wish_view():
     input_format, voice_in = bottle.request.headers.get('Content-Type'), False
