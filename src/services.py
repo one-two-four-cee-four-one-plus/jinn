@@ -104,10 +104,15 @@ def wish(key, model, text, incantations, allow_craft=False):
             ' If there is no suitable tool available, define one instead of fulfilling'
             ' the original request. The tool should be generic enough to be useful in'
             ' other situations, but should only use numbers, strings and booleans as types.'
+            ' If the request is a question, just answer it shortly. '
             f'\nRequest:\n{text}'
         )
     else:
-        instructions = f'Use one of the provided externals tools to fulfill the request. \nRequest:\n{text}'
+        instructions = (
+            'Use one of the provided externals tools to fulfill the request. '
+            ' If the request is a question, just answer it shortly. '
+            '\nRequest:\n{text}'
+        )
     response = OpenAI(api_key=key).chat.completions.create(
         model=model,
         temperature=0,
