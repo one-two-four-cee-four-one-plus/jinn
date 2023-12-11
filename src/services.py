@@ -127,6 +127,7 @@ def wish(key, model, text, incantations, allow_craft=False):
     if tool_calls := response_message.tool_calls:
         if tool_calls[0].function.name == 'craft_incantation':
             tool_text = json.loads(tool_calls[0].function.arguments)['text']
+            logger.info(f'wish({text}) = craft_incantation({tool_text})')
             return None, tool_text
         else:
             incantation = incantations[tool_calls[0].function.name]
@@ -138,6 +139,7 @@ def wish(key, model, text, incantations, allow_craft=False):
             except Exception as e:
                 return incantation['object'], tool_calls[0].function.arguments, e
     else:
+        logger.info(f'wish({text}) = {response_message.content}')
         return response_message.content
 
 
