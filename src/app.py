@@ -250,7 +250,7 @@ def incantation_view(id):
     '''
 
     return f'''
-        <a href="/">back</a>
+        <a href="/incantations">back</a>
         <h1>{incantation.name}</h1>
         <p>{incantation.request}</p>
         <details>
@@ -263,6 +263,7 @@ def incantation_view(id):
         <details>
             <summary>schema</summary>
             <pre>{incantation.schema}</pre>
+            <a href="/incantation/{id}/redescribe">Redescribe</a>
         </details>
         <details>
             <summary>overrides</summary>
@@ -312,6 +313,13 @@ def incantation_code_view(id):
     incantation = master().incantation(id)
     incantation.code = bottle.request.forms.get('code')
     incantation.save()
+    return bottle.redirect(f'/incantation/{id}')
+
+
+@bottle.get('/incantation/<id>/redescribe')
+def incantation_update_schema_view(id):
+    incantation = master().incantation(id)
+    incantation.redescribe()
     return bottle.redirect(f'/incantation/{id}')
 
 
@@ -409,7 +417,6 @@ def api_prepare_view():
 def api_craft_and_prepare_view():
     data = json.loads(bottle.request.body.read().decode('utf-8'))
     result = api_master().proceed(data)
-    print(data, result)
     return json.dumps(result)
 
 
