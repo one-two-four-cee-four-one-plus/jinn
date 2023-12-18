@@ -239,8 +239,14 @@ class Incantation(macaron.Model, BaseModel):
     def execute(self, data):
         _, func = define_function(self.code)
         args = json.loads(data['args'])
-        for key, value in json.loads(self.overrides).items():
-            args[key] = value
+        for key, value in self.overrides_dict.items():
+            try:
+                args[key] = float(value)
+            except ValueError:
+                try:
+                    args[key] = int(value)
+                except ValueError:
+                    args[key] = value
         return {'result': func(**args)}
 
 
