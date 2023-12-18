@@ -105,6 +105,8 @@ def wish(key, model, text, incantations, allow_craft=False, call=True):
             ' the original request. The tool should be generic enough to be useful in'
             ' other situations, but should only use numbers, strings and booleans as types.'
             ' If the request has a word "question" in the beginning, just answer it shortly.'
+            ' When calling tools with credentials, configuration, etc, that cannot'
+            ' be infered from the request, pass empty strings instead of them.'
             f'\nRequest:\n{text}'
         )
     else:
@@ -131,10 +133,9 @@ def wish(key, model, text, incantations, allow_craft=False, call=True):
         elif call:
             try:
                 incantation = incantations[tool_calls[0].function.name]
-                _, func = define_function(incantation['code'])
                 args = json.loads(tool_calls[0].function.arguments)
                 logger.info(f'wish({text}) = {tool_calls[0].function.name} {args}')
-                return func(**args)
+                return incantation['object'].execute({'args': args})['result']
             except Exception as e:
                 return incantation['object'], tool_calls[0].function.arguments, e
         else:

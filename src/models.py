@@ -163,8 +163,7 @@ class Master(macaron.Model, BaseModel):
 
     def execute(self, data):
         incantation = self.incantation(data['incantation'])
-        _, func = define_function(incantation.code)
-        return {'result': func(**json.loads(data['args']))}
+        return incantation.execute(data)
 
     def proceed(self, data):
         if 'result' in data:
@@ -208,18 +207,8 @@ class Incantation(macaron.Model, BaseModel):
     def overrides_dict(self):
         return json.loads(self.overrides)
 
-    def update_overrides(self, new_overrides):
-        overrides = {}
-        for key, value in new_overrides.items():
-            if value:
-                overrides[key] = value
-        self.overrides = json.dumps(overrides)
-        self.code = ReplaceVariables.in_(self.name, self.code, overrides)
-        new_schema = json.loads(self.schema)
-        for key in overrides:
-            new_schema['function']['parameters']['properties'].pop(key, None)
-            new_schema['function']['parameters']['required'].remove(key)
-        self.schema = json.dumps(new_schema)
+    def update_overrides(self, overrides):
+        self.overrides = json.dumps(overrides) if isinstance(overrides, dict) else overrides
         self.save()
 
     def adjust(self, reason, update_schema=False):
@@ -246,6 +235,13 @@ class Incantation(macaron.Model, BaseModel):
             Config.get_value('openai_key'), Config.get_value('openai_model'), self.code
         )
         self.save()
+
+    def execute(self, data):
+        _, func = define_function(self.code)
+        args = json.loads(data['args'])
+        for key, value in json.loads(self.overrides).items():
+            args[key] = value
+        return {'result': func(**args)}
 
 
 class Mishap(macaron.Model, BaseModel):

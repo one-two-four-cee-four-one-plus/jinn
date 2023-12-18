@@ -280,8 +280,12 @@ def incantation_view(id):
 @bottle.post('/incantation/<id>/override')
 def incantation_override_view(id):
     incantation = master().incantation(id)
+    overrides = {}
+    for override in bottle.request.forms:
+        if bottle.request.forms.get(override):
+            overrides[override] = bottle.request.forms.get(override)
     try:
-        incantation.update_overrides(bottle.request.forms)
+        incantation.update_overrides(overrides)
     except Exception as e:
         Incident.create(
             type='override',
